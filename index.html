@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Youtube task : Buber Irina</title>
+        <link href="https://fonts.googleapis.com/css?family=PT+Serif|Roboto" rel="stylesheet">
+        <link href="https://use.fontawesome.com/79afc6f58f.css" media="all" rel="stylesheet">
+        <link rel="stylesheet" href="build/css/style.css">
+    </head>
+    <body>
+        <header class="header-search">
+            <div id="searchWrap">
+                <input type="text" id="searchQuery" class="input" placeholder="Enter the query">
+                <button type="button" class="btn btn-search" id="searchSubmit" onclick='window.app.search()'>
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+        </header>
+        <div class="container" id="searchViewport">
+            <div id="searchFrame">
+                <div id="searchResult" class="search-items">
+                </div>
+            </div>
+        </div>
+         <div class="pagination" id="searchPagination" style="display:none">
+                <button type="button" class="btn btn-control btn_to-start" id = "toStart" style="visibility:hidden" title="1">
+                    <i class="fa fa-angle-double-left" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-control btn-control_left" id ="prevPage" style="visibility:hidden" title="1">
+                    <i class="fa fa-angle-left" aria-hidden="true"></i>
+                </button>
+                <span class="pagination__current" id="pageCur" title="1">1</span>
+                <button type="button" class="btn btn-control btn-control_right" id="nextPage" title="2">
+                    <i class="fa fa-angle-right" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <script src="build/bundle.js"></script>
+        <script>
+            window.app.start();
+        </script>
+        <script>
+            document.addEventListener('touchstart', handleTouchStart, false);
+            document.addEventListener('touchmove', handleTouchMove, false);
+            let xDown = null;
+            let yDown = null;
+            function handleTouchStart(evt) {
+                xDown = evt.originalEvent.touches[0].clientX;
+                yDown = evt.originalEvent.touches[0].clientY;
+            };
+            function handleTouchMove(evt) {
+                if ( ! xDown || ! yDown ) {
+                    return;
+            }
+            let xUp = evt.originalEvent.touches[0].clientX;
+            let yUp = evt.originalEvent.touches[0].clientY;
+            let xDiff = xDown - xUp;
+            let yDiff = yDown - yUp;
+            if ( Math.abs( xDiff ) > Math.abs( yDiff ) ) {
+                if ( xDiff > 0 ) {
+                    window.app.prevPage();
+                } else {
+                    window.app.nextPage();
+                }
+            } 
+            xDown = null;
+            yDown = null;
+        };
+        </script>
+    </body>
+</html>
