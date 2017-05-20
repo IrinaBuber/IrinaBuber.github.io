@@ -425,6 +425,10 @@ body {
     color: #616161;
     padding: 10px;
     border-top: 1px solid #ccc; }
+  .item__views {
+    display: inline-block;
+    color: #616161;
+    padding: 0px 10px 10px 10px; }
 
 .pagination {
   display: flex;

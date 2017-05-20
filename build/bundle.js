@@ -85,20 +85,21 @@
 "use strict";
 class GAPIclient {
     constructor(APIKey, maxResults) {
-        this.address = 'https://www.googleapis.com/youtube/v3/search?key=' + APIKey + '&type=video&part=snippet&maxResults=' + maxResults + '&q=';
+        this.searchAddress = 'https://www.googleapis.com/youtube/v3/search?key=' + APIKey + '&type=video&part=snippet&maxResults=' + maxResults + '&q=';
+        this.viewsCountAddress = 'https://www.googleapis.com/youtube/v3/videos?key=' + APIKey + '&part=statistics&'+ '&id=';
     }
    
     search(query, nextPageToken) {
-        let address = this.address;
         let token = "";
         if (nextPageToken)
             token = "&pageToken="+ nextPageToken;
-        return new Promise(function (resolve, reject) {
+        return new Promise(function(resolve, reject) {
             const xhr = new XMLHttpRequest();
-            xhr.open("GET", address + query + token, true);
+            xhr.open("GET", this.searchAddress + query + token, true);
+            let that = this;
             xhr.onload = function () {
                 if (this.status >= 200 && this.status < 300) {
-                    resolve(this.response);
+                    that.getViewsCount(this.response).then(resolve, reject);                    
                 }
                 else {
                     reject(this.status);
@@ -108,8 +109,41 @@ class GAPIclient {
                 reject(this.status);
             };
             xhr.send();
-        });
+        }.bind(this));
     }
+
+    getViewsCount(searchResult){
+        const result = JSON.parse(searchResult);
+        const ids = result.items.map(x => x.id.videoId);
+         return new Promise(function (resolve, reject) {
+            const xhr = new XMLHttpRequest();            
+            xhr.open("GET", this.viewsCountAddress + ids.reduce((acc, cur, idx, array) => {
+                acc = acc + cur;
+                if (idx < array.length - 1)
+                    acc = acc + ",";
+                return acc;
+            }, ""), true);
+
+            xhr.onload = function () {
+                if (this.status >= 200 && this.status < 300) {
+                    const viewsResponse = JSON.parse(this.response);
+                    for(let i in result.items) {
+                        if (result.items[i].id.videoId != viewsResponse.items[i].id) continue;
+                        result.items[i].viewsCount = viewsResponse.items[i].statistics.viewCount;
+                    }                    
+                    resolve(result);
+                }
+                else {
+                    reject(this.status);
+                }
+            };
+            xhr.onerror = function () {
+                reject(this.status);
+            };
+            xhr.send();
+        }.bind(this));
+    }
+
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = GAPIclient;
 
@@ -129,7 +163,7 @@ class Item{
         this.publishDate = new Date(youtubeItem.snippet.publishedAt).toDateString();
         this.link = 'https://www.youtube.com/watch?v='+ youtubeItem.id.videoId;
         this.videoId = youtubeItem.id.videoId;
-        this.next = youtubeItem.nextPageToken;
+        this.views = youtubeItem.viewsCount;
     }
     toNode(){
         let item = document.createElement("div");
@@ -161,10 +195,14 @@ class Item{
             item.appendChild(itemDescription);
             
             let itemDate = document.createElement("span");
-            itemDate.className = 'item__date';
-          
+            itemDate.className = 'item__date';          
             itemDate.innerHTML = '<i class="fa fa-calendar"></i> '+ this.publishDate;
             item.appendChild(itemDate);
+
+            let itemViews = document.createElement("span");
+            itemViews.className = 'item__views';          
+            itemViews.innerHTML = '<i class="fa fa-eye"></i> '+ this.views;
+            item.appendChild(itemViews);
             return item;
     }
 
@@ -222,13 +260,13 @@ class App{
         } else if (window.matchMedia("(max-width: 1135px)").matches) {
             this._searchViewport.style = 'width:662px';
          } else if (window.matchMedia("(max-width: 1500px)").matches) {
-            this._searchViewport.style = 'width:1008px';
+            this._searchViewport.style = 'width:1007px';
          } else if (window.matchMedia("(max-width: 1710px)").matches) {
             this._searchViewport.style = 'width:1352px';
          } else if (window.matchMedia("(min-width: 1711px)").matches) {
             this._searchViewport.style = 'width:1697px';
          }
-    }
+     }
      start(){
         this.setViewport();
         let bindedSearch = this.search.bind(this);
@@ -236,17 +274,17 @@ class App{
         this._nextPage.onclick = this.nextPage.bind(this);
         this._prevPage.onclick = this.prevPage.bind(this);
         this._toStart.onclick = this.toStart.bind(this);
+        this._queryNode.onkeypress = this.onPressKey.bind(this);
         window.onresize = this.setViewport.bind(this);
      }
      
      search(){
          this.clear();
          let query = this._queryNode.value;
-         this._gAPIclient.search(query).then((data) => { 
+         this._gAPIclient.search(query).then((data) => {              
              this._nextPageToken = data.nextPageToken;
-             let parsed = JSON.parse(data);
-             for (let i in parsed.items){
-                 let newItem = new __WEBPACK_IMPORTED_MODULE_1__item__["a" /* default */](parsed.items[i]);
+             for (let i in data.items){
+                 let newItem = new __WEBPACK_IMPORTED_MODULE_1__item__["a" /* default */](data.items[i]);
                  this._itemCollection.push(newItem);
                  this._resultNode.appendChild(newItem.toNode());
                  this._widthVisible = this._widthVisible * 2;
@@ -256,15 +294,24 @@ class App{
          }, console.error);
         
      }
+     onPressKey(event){
+         var keyPressed = event.keyCode || event.which;
+         if(keyPressed==13){
+             this.search();
+             keyPressed=null;
+        } 
+    }
      setTitles(){
         this._prevPage.title = this._cur - 1;
+        this._pageCur.titleL = this._cur;
         this._nextPage.title = this._cur + 1;
      }
+     
      nextPage(){
-        let numPerPage = this._widthVisible / __WEBPACK_IMPORTED_MODULE_0__config__["a" /* default */].widthItem;
+        let numPerPage = Math.ceil(this._searchViewport.offsetWidth / __WEBPACK_IMPORTED_MODULE_0__config__["a" /* default */].widthItem);
         let shift = this._shift - this._searchViewport.clientWidth - 28;
         this._shift = shift;
-        let numViewedPages = this._shift / numPerPage;
+        let numViewedItems = Math.floor((shift * (-1) + 28) / __WEBPACK_IMPORTED_MODULE_0__config__["a" /* default */].widthItem);
         this._searchFrame.style = 'transform: translate3d( ' + shift + 'px, 0px, 0px); transition-duration: 0ms;'
         this._cur = this._cur + 1;
         this._pageCur.innerHTML = this._cur;
@@ -273,13 +320,11 @@ class App{
         } else if (this._cur == 3){
             this._toStart.style = 'visibility:visible';
         }
-        if (numViewedPages < 2){
+        if ( this._itemCollection.length - numViewedItems < numPerPage * 2 + 1){
             this._gAPIclient.search(this._queryNode.value, this._nextPageToken).then((data) => { 
              this._nextPageToken = data.nextPageToken;
-             let parsed = JSON.parse(data);
-             for (let i in parsed.items)
-             {
-                 let newItem = new __WEBPACK_IMPORTED_MODULE_1__item__["a" /* default */](parsed.items[i]);
+             for (let i in data.items)             {
+                 let newItem = new __WEBPACK_IMPORTED_MODULE_1__item__["a" /* default */](data.items[i]);
                  this._itemCollection.push(newItem);
                  this._resultNode.appendChild(newItem.toNode());
              }
